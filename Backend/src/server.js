@@ -18,8 +18,8 @@ import authRoutes from "./auth/authRoutes.js";
 // ============================================
 // Database Connection
 // ============================================
-
-await connectDB();
+// Connected asynchronously in the background once the server starts listening,
+// to prevent Render deployment startup timeouts.
 
 
 // ============================================
@@ -142,46 +142,58 @@ app.use((err, req, res, next) => {
 const io = initializeSocket(httpServer);
 
 // ============================================
-// Redis — connect FIRST, then attach adapter
-// ============================================
-
-let redisEnabled = false;
-
-try {
-  const pubClient = await connectRedis();
-
-  if (pubClient) {
-    // subClient must be a *duplicate* of pubClient — same config/auth
-    const subClient = pubClient.duplicate();
-
-    subClient.on('error', (err) =>
-      console.error('[Redis] Sub-client error:', err.message ?? err)
-    );
-
-    await subClient.connect();
-
-    io.adapter(createAdapter(pubClient, subClient));
-    redisEnabled = true;
-    console.log('[Redis] Adapter enabled — Socket.IO will scale across instances');
-  } else {
-    console.warn('[Redis] Adapter NOT enabled — running with single-instance Socket.IO');
-  }
-} catch (err) {
-  console.error('[Redis] Adapter setup failed:', err.message ?? err);
-  console.warn('[Redis] Failed → fallback mode — single-instance Socket.IO only');
-}
-
-if (!redisEnabled) {
-  console.log('[Redis] Running without Redis adapter (fallback mode)');
-}
-
-// ============================================
-// Start Server
+// Start Server First (Prevents Render Startup Timeouts)
 // ============================================
 
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  
+  // Connect to databases asynchronously in the background
+  initializeServices();
 });
+
+// ============================================
+// Background Services Initialization
+// ============================================
+
+async function initializeServices() {
+  // 1. Connect MongoDB
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error("[DB] Failed to connect to MongoDB:", err.message ?? err);
+  }
+
+  // 2. Connect Redis and Enable Adapter
+  let redisEnabled = false;
+  try {
+    const pubClient = await connectRedis();
+
+    if (pubClient) {
+      // subClient must be a *duplicate* of pubClient — same config/auth
+      const subClient = pubClient.duplicate();
+
+      subClient.on('error', (err) =>
+        console.error('[Redis] Sub-client error:', err.message ?? err)
+      );
+
+      await subClient.connect();
+
+      io.adapter(createAdapter(pubClient, subClient));
+      redisEnabled = true;
+      console.log('[Redis] Adapter enabled — Socket.IO will scale across instances');
+    } else {
+      console.warn('[Redis] Adapter NOT enabled — running with single-instance Socket.IO');
+    }
+  } catch (err) {
+    console.error('[Redis] Adapter setup failed:', err.message ?? err);
+    console.warn('[Redis] Failed → fallback mode — single-instance Socket.IO only');
+  }
+
+  if (!redisEnabled) {
+    console.log('[Redis] Running without Redis adapter (fallback mode)');
+  }
+}
 
 // ============================================
 // Graceful Shutdown
