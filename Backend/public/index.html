@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scribble Game - WebSocket Test Client</title>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 30px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .panel {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .panel h2 {
+      color: #667eea;
+      margin-bottom: 15px;
+      font-size: 20px;
+    }
+
+    .status {
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-weight: bold;
+    }
+
+    .status.disconnected {
+      background: #fee;
+      color: #c33;
+    }
+
+    .status.connected {
+      background: #efe;
+      color: #3c3;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #5568d3;
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .chat-panel {
+      grid-column: 1 / -1;
+    }
+
+    .messages {
+      height: 300px;
+      overflow-y: auto;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 15px;
+      background: #f9f9f9;
+    }
+
+    .message {
+      margin-bottom: 10px;
+      padding: 8px;
+      background: white;
+      border-radius: 6px;
+      border-left: 3px solid #667eea;
+    }
+
+    .message.system {
+      border-left-color: #f39c12;
+      background: #fef9e7;
+    }
+
+    .message.error {
+      border-left-color: #e74c3c;
+      background: #fadbd8;
+    }
+
+    .message .username {
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .message .timestamp {
+      font-size: 11px;
+      color: #999;
+      margin-left: 10px;
+    }
+
+    .players-list {
+      list-style: none;
+    }
+
+    .player-item {
+      padding: 10px;
+      margin-bottom: 8px;
+      background: #f7f7f7;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .player-item .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    .player-item .status-dot.online {
+      background: #2ecc71;
+    }
+
+    .player-item .status-dot.offline {
+      background: #e74c3c;
+    }
+
+    .info-display {
+      background: #f0f0f0;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+
+    .info-display strong {
+      color: #667eea;
+    }
+
+    .game-panel {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-align: center;
+    }
+
+    .game-panel h2 {
+      color: white;
+    }
+
+    .game-status {
+      font-size: 18px;
+      font-weight: bold;
+      padding: 15px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+
+    .timer-display {
+      font-size: 48px;
+      font-weight: bold;
+      margin: 20px 0;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .word-display {
+      font-size: 32px;
+      font-weight: bold;
+      letter-spacing: 5px;
+      margin: 20px 0;
+      padding: 20px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 6px;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .round-info {
+      font-size: 14px;
+      margin-bottom: 15px;
+      opacity: 0.9;
+    }
+
+    .btn-start-game {
+      background: #2ecc71;
+      font-size: 16px;
+      padding: 15px;
+    }
+
+    .btn-start-game:hover {
+      background: #27ae60;
+    }
+
+    .guess-section {
+      margin-top: 15px;
+    }
+
+    /* ============================================
+       Phase 4: Canvas Drawing Styles
+    ============================================ */
+
+    .canvas-panel {
+      grid-column: 1 / -1;
+    }
+
+    .canvas-panel h2 {
+      color: #667eea;
+      margin-bottom: 15px;
+    }
+
+    .drawing-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      padding: 12px 16px;
+      background: #f4f4f8;
+      border-radius: 8px;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-group label {
+      margin-bottom: 0;
+      font-size: 13px;
+      color: #555;
+      white-space: nowrap;
+    }
+
+    .toolbar-group input[type='color'] {
+      width: 38px;
+      height: 38px;
+      padding: 2px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      background: none;
+    }
+
+    .toolbar-group input[type='range'] {
+      width: 100px;
+      cursor: pointer;
+      accent-color: #667eea;
+    }
+
+    #brush-size-preview {
+      display: inline-block;
+      background: #333;
+      border-radius: 50%;
+      vertical-align: middle;
+      transition: width 0.1s, height 0.1s;
+    }
+
+    .toolbar-btn {
+      width: auto;
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      display: block;
+      max-width: 800px;
+      width: 100%;
+    }
+
+    #drawingBoard {
+      display: block;
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      touch-action: none;
+      cursor: default;
+    }
+
+    #drawingBoard.drawing {
+      cursor: crosshair;
+    }
+
+    #drawingBoard.locked {
+      cursor: not-allowed;
+      opacity: 0.85;
+    }
+
+    #canvas-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.18);
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-shadow: 1px 1px 6px rgba(0,0,0,0.5);
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    #canvas-overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .drawing-info-bar {
+      display: flex;
+      gap: 20px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: #777;
+    }
+
+    .drawing-info-bar span strong {
+      color: #444;
+    }
+
+    @media (max-width: 768px) {
+      .panels {
+        grid-template-columns: 1fr;
+      }
+
+      .drawing-toolbar {
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 Scribble Game - WebSocket Test Client</h1>
+
+    <div class="panels">
+      <!-- Connection Panel -->
+      <div class="panel">
+        <h2>Connection</h2>
+        <div id="connection-status" class="status disconnected">
+          ⚫ Disconnected
+        </div>
+        <div class="info-display">
+          <strong>Socket ID:</strong> <span id="socket-id">-</span><br>
+          <strong>User ID:</strong> <span id="user-id">-</span>
+        </div>
+        <button id="btn-connect">Connect to Server</button>
+      </div>
+
+      <!-- Room Panel -->
+      <div class="panel">
+        <h2>Room Actions</h2>
+        <div class="form-group">
+          <label>Room ID:</label>
+          <input type="text" id="input-room-id" placeholder="e.g., game-123">
+        </div>
+        <div class="form-group">
+          <label>Username:</label>
+          <input type="text" id="input-username" placeholder="e.g., Player1">
+        </div>
+        <button id="btn-create-room" disabled>Create Room</button>
+        <button id="btn-join-room" disabled style="margin-top: 10px;">Join Room</button>
+        <button id="btn-reconnect" disabled style="margin-top: 10px; background: #f39c12;">Reconnect</button>
+      </div>
+
+      <!-- Game Panel (Phase 3) -->
+      <div class="panel game-panel">
+        <h2>🎮 Game Control</h2>
+        <div class="game-status" id="game-status">
+          ⏸️ Waiting to start
+        </div>
+        <div class="round-info" id="round-info">
+          Round: - / - | Drawer: -
+        </div>
+        <div class="timer-display" id="timer-display">
+          --
+        </div>
+        <div class="word-display" id="word-display">
+          No word yet
+        </div>
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label style="color: white;">Total Rounds (1-10):</label>
+          <input type="number" id="input-total-rounds" min="1" max="10" value="3" style="text-align: center;">
+        </div>
+        <button id="btn-start-game" class="btn-start-game" disabled>Start Game</button>
+        <button id="btn-reset-game" disabled style="margin-top: 10px; background: #e74c3c;">Reset Game</button>
+        <div class="guess-section">
+          <div class="form-group">
+            <input type="text" id="input-guess" placeholder="Type your guess..." disabled>
+          </div>
+          <button id="btn-submit-guess" disabled>Submit Guess</button>
+        </div>
+      </div>
+
+      <!-- Players Panel -->
+      <div class="panel">
+        <h2>Players in Room</h2>
+        <div class="info-display">
+          <strong>Current Room:</strong> <span id="current-room">-</span>
+        </div>
+        <ul id="players-list" class="players-list">
+          <li style="color: #999; text-align: center; padding: 20px;">Not in a room</li>
+        </ul>
+      </div>
+
+      <!-- Canvas Panel (Phase 4) -->
+      <div class="panel canvas-panel" id="canvas-panel">
+        <h2>🎨 Drawing Board</h2>
+
+        <!-- Toolbar -->
+        <div class="drawing-toolbar">
+          <div class="toolbar-group">
+            <label for="color-picker">Color:</label>
+            <input type="color" id="color-picker" value="#000000">
+          </div>
+          <div class="toolbar-group">
+            <label for="brush-size">Size: <span id="brush-size-label">8</span>px</label>
+            <input type="range" id="brush-size" min="1" max="50" value="8">
+            <span id="brush-size-preview" style="width:8px;height:8px;"></span>
+          </div>
+          <button id="btn-clear-canvas" class="toolbar-btn" disabled style="background:#e74c3c;">🗑️ Clear</button>
+          <button id="btn-sync-strokes" class="toolbar-btn" disabled style="background:#3498db;">🔄 Sync</button>
+          <div class="toolbar-group" style="margin-left:auto;">
+            <span id="drawing-status" style="font-size:13px;color:#888;">Not drawing</span>
+          </div>
+        </div>
+
+        <!-- Canvas -->
+        <div class="canvas-wrapper">
+          <canvas id="drawingBoard" width="800" height="500"></canvas>
+          <div id="canvas-overlay">✋ Only the drawer can draw</div>
+        </div>
+
+        <!-- Info bar -->
+        <div class="drawing-info-bar">
+          <span><strong>Strokes:</strong> <span id="stroke-count">0</span></span>
+          <span><strong>Color:</strong> <span id="current-color-display">#000000</span></span>
+          <span><strong>Size:</strong> <span id="current-size-display">8</span>px</span>
+        </div>
+      </div>
+
+      <!-- Chat Panel -->
+      <div class="panel chat-panel">
+        <h2>Chat & Messages</h2>
+        <div id="messages" class="messages"></div>
+        <div class="form-group">
+          <input type="text" id="input-message" placeholder="Type a message..." disabled>
+        </div>
+        <button id="btn-send-message" disabled>Send Message</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let socket = null;
+    let currentUserId = null;
+    let currentRoomId = null;
+    let currentUsername = null;
+    let isDrawer = false;
+    let gameState = 'waiting';
+    let currentRound = 0; // Phase 3
+    let totalRounds = 0;  // Phase 3
+
+    // ============================================
+    // Phase 4: Canvas Drawing Engine
+    // ============================================
+    const canvas = document.getElementById('drawingBoard');
+    const ctx = canvas.getContext('2d');
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    let isDrawing = false;
+    let prevPos = { x: 0, y: 0 };
+    let currentColor = '#000000';
+    let currentSize = 8;
+    let localStrokeCount = 0;
+    let strokeQueue = []; // rAF batch queue
+
+    // Toolbar elements
+    const colorPicker = document.getElementById('color-picker');
+    const brushSizeInput = document.getElementById('brush-size');
+    const brushSizeLabel = document.getElementById('brush-size-label');
+    const brushSizePreview = document.getElementById('brush-size-preview');
+    const canvasOverlay = document.getElementById('canvas-overlay');
+    const strokeCountDisplay = document.getElementById('stroke-count');
+    const currentColorDisplay = document.getElementById('current-color-display');
+    const currentSizeDisplay = document.getElementById('current-size-display');
+    const drawingStatusDisplay = document.getElementById('drawing-status');
+    const btnClearCanvas = document.getElementById('btn-clear-canvas');
+    const btnSyncStrokes = document.getElementById('btn-sync-strokes');
+
+    // Toolbar sync: color
+    colorPicker.addEventListener('input', () => {
+      currentColor = colorPicker.value;
+      currentColorDisplay.textContent = currentColor;
+    });
+
+    // Toolbar sync: brush size
+    brushSizeInput.addEventListener('input', () => {
+      currentSize = parseInt(brushSizeInput.value);
+      brushSizeLabel.textContent = currentSize;
+      currentSizeDisplay.textContent = currentSize;
+      brushSizePreview.style.width = currentSize + 'px';
+      brushSizePreview.style.height = currentSize + 'px';
+    });
+
+    // ── Canvas helpers ────────────────────────────────────────
+
+    function getMousePos(canvasEl, event) {
+      const rect = canvasEl.getBoundingClientRect();
+      // Account for CSS scaling (canvas.width vs rendered width)
+      const scaleX = canvasEl.width / rect.width;
+      const scaleY = canvasEl.height / rect.height;
+      return {
+        x: (event.clientX - rect.left) * scaleX,
+        y: (event.clientY - rect.top)  * scaleY
+      };
+    }
+
+    function drawLine(prevX, prevY, x, y, color, size) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size;
+      ctx.beginPath();
+      ctx.moveTo(prevX, prevY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      localStrokeCount = 0;
+      strokeCountDisplay.textContent = '0';
+    }
+
+    function setCanvasLocked(locked, message = '✋ Only the drawer can draw') {
+      if (locked) {
+        canvas.classList.add('locked');
+        canvas.classList.remove('drawing');
+        canvas.style.pointerEvents = 'none';
+        canvasOverlay.textContent = message;
+        canvasOverlay.classList.add('visible');
+      } else {
+        canvas.classList.remove('locked');
+        canvas.classList.add('drawing');
+        canvas.style.pointerEvents = 'auto';
+        canvasOverlay.classList.remove('visible');
+      }
+    }
+
+    // ── Mouse event handlers ──────────────────────────────────
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (!isDrawer || gameState !== 'playing') return;
+      isDrawing = true;
+      prevPos = getMousePos(canvas, e);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isDrawing || !isDrawer || gameState !== 'playing') return;
+
+      const pos = getMousePos(canvas, e);
+
+      // Draw locally immediately for zero-latency feel
+      drawLine(prevPos.x, prevPos.y, pos.x, pos.y, currentColor, currentSize);
+
+      // Queue stroke — rAF loop will flush to server at ~60 fps
+      strokeQueue.push({
+        x: pos.x,
+        y: pos.y,
+        prevX: prevPos.x,
+        prevY: prevPos.y,
+        color: currentColor,
+        size: currentSize
+      });
+      localStrokeCount++;
+      strokeCountDisplay.textContent = localStrokeCount;
+
+      prevPos = pos;
+    });
+
+    canvas.addEventListener('mouseup', () => { isDrawing = false; });
+    canvas.addEventListener('mouseleave', () => { isDrawing = false; });
+
+    // ── rAF batch sender ─────────────────────────────────────
+    // Flushes strokeQueue to server at display frame rate (~60 fps)
+    // Runs continuously so it never drops a stroke
+    function sendStrokeBatch() {
+      if (strokeQueue.length > 0 && socket && socket.connected && currentRoomId) {
+        socket.emit('draw_stroke_batch', {
+          roomId: currentRoomId,
+          strokes: strokeQueue
+        });
+        strokeQueue = [];
+      }
+      requestAnimationFrame(sendStrokeBatch);
+    }
+    requestAnimationFrame(sendStrokeBatch);
+
+    // Lock canvas on page load until game starts
+    setCanvasLocked(true, '⏸️ Waiting to start');
+
+    // DOM Elements
+    const connectionStatus = document.getElementById('connection-status');
+    const socketIdDisplay = document.getElementById('socket-id');
+    const userIdDisplay = document.getElementById('user-id');
+    const currentRoomDisplay = document.getElementById('current-room');
+    const messagesDiv = document.getElementById('messages');
+    const playersList = document.getElementById('players-list');
+
+    const inputRoomId = document.getElementById('input-room-id');
+    const inputUsername = document.getElementById('input-username');
+    const inputMessage = document.getElementById('input-message');
+    const inputGuess = document.getElementById('input-guess');
+    const inputTotalRounds = document.getElementById('input-total-rounds'); // Phase 3
+
+    const btnConnect = document.getElementById('btn-connect');
+    const btnCreateRoom = document.getElementById('btn-create-room');
+    const btnJoinRoom = document.getElementById('btn-join-room');
+    const btnReconnect = document.getElementById('btn-reconnect');
+    const btnSendMessage = document.getElementById('btn-send-message');
+    const btnStartGame = document.getElementById('btn-start-game');
+    const btnResetGame = document.getElementById('btn-reset-game'); // Phase 3
+    const btnSubmitGuess = document.getElementById('btn-submit-guess');
+    
+    // Game UI Elements
+    const gameStatusDisplay = document.getElementById('game-status');
+    const roundInfoDisplay = document.getElementById('round-info');
+    const timerDisplay = document.getElementById('timer-display');
+    const wordDisplay = document.getElementById('word-display');
+
+    // Connect to server
+    btnConnect.addEventListener('click', () => {
+      if (socket && socket.connected) {
+        socket.disconnect();
+        return;
+      }
+
+      addMessage('system', 'Connecting to server...');
+      socket = io(window.location.origin, {
+        transports: ['websocket', 'polling']
+      });
+
+      setupSocketListeners();
+    });
+
+    // Setup socket event listeners
+    function setupSocketListeners() {
+      socket.on('connect', () => {
+        addMessage('system', '✅ Connected to server');
+        connectionStatus.textContent = '🟢 Connected';
+        connectionStatus.className = 'status connected';
+        socketIdDisplay.textContent = socket.id;
+        btnConnect.textContent = 'Disconnect';
+        btnCreateRoom.disabled = false;
+        btnJoinRoom.disabled = false;
+      });
+
+      socket.on('disconnect', (reason) => {
+        addMessage('system', `❌ Disconnected: ${reason}`);
+        connectionStatus.textContent = '⚫ Disconnected';
+        connectionStatus.className = 'status disconnected';
+        btnConnect.textContent = 'Connect to Server';
+        btnCreateRoom.disabled = true;
+        btnJoinRoom.disabled = true;
+        btnSendMessage.disabled = true;
+        inputMessage.disabled = true;
+        btnReconnect.disabled = false;
+      });
+
+      socket.on('room_created', (data) => {
+        addMessage('system', `✅ Room created: ${data.roomId}`);
+      });
+
+      socket.on('room_joined', (data) => {
+        addMessage('system', `✅ Joined room: ${data.roomId} as ${data.username}`);
+        currentRoomId = data.roomId;
+        currentUserId = data.userId;
+        currentUsername = data.username;
+        currentRoomDisplay.textContent = data.roomId;
+        userIdDisplay.textContent = data.userId;
+        btnSendMessage.disabled = false;
+        inputMessage.disabled = false;
+        btnReconnect.disabled = false;
+        btnStartGame.disabled = false; // Phase 2: Enable start game button
+      });
+
+      socket.on('room_error', (data) => {
+        addMessage('error', `❌ Error: ${data.error}`);
+      });
+
+      socket.on('receive_message', (data) => {
+        addMessage('user', `${data.username}: ${data.message}`, data.timestamp);
+      });
+
+      socket.on('player_list_update', (data) => {
+        updatePlayersList(data.players);
+      });
+
+      socket.on('player_disconnected', (data) => {
+        addMessage('system', `⚠️ ${data.username} disconnected`);
+      });
+
+      socket.on('player_reconnected', (data) => {
+        addMessage('system', `✅ ${data.username} reconnected`);
+      });
+
+      // ============================================
+      // Phase 3: Game Events (Updated)
+      // ============================================
+
+      socket.on('game_started', (data) => {
+        totalRounds = data.totalRounds || 3;
+        addMessage('system', `🎮 Game started with ${totalRounds} rounds!`);
+        gameState = 'playing';
+        updateGameStatus('🎮 Game in progress');
+        btnStartGame.disabled = true;
+        btnResetGame.disabled = true;
+        inputTotalRounds.disabled = true;
+      });
+
+      socket.on('round_started', (data) => {
+        currentRound = data.roundNumber;
+        totalRounds = totalRounds || 3;
+        addMessage('system', `🎯 Round ${data.roundNumber}/${totalRounds} started - ${data.drawerName} is drawing!`);
+        isDrawer = (data.drawerId === currentUserId);
+        gameState = 'playing';
+        
+        roundInfoDisplay.textContent = `Round: ${data.roundNumber}/${totalRounds} | Drawer: ${data.drawerName}`;
+        
+        // Phase 4: Update drawing controls
+        testStrokeCount = 0;
+        strokeCountDisplay.textContent = '0';
+        
+        if (isDrawer) {
+          updateGameStatus('🎨 You are drawing!');
+          wordDisplay.textContent = 'Word loading...';
+          inputGuess.disabled = true;
+          btnSubmitGuess.disabled = true;
+          // Phase 4: unlock canvas for drawer
+          setCanvasLocked(false);
+          btnClearCanvas.disabled = false;
+          btnSyncStrokes.disabled = false;
+          drawingStatusDisplay.textContent = '🖊️ You are drawing';
+          drawingStatusDisplay.style.color = '#2ecc71';
+        } else {
+          updateGameStatus('🤔 Guess the word!');
+          wordDisplay.textContent = '_ _ _ _ _';
+          inputGuess.disabled = false;
+          btnSubmitGuess.disabled = false;
+          // Phase 4: lock canvas for guessers, allow sync
+          setCanvasLocked(true, '✋ Only the drawer can draw');
+          btnClearCanvas.disabled = true;
+          btnSyncStrokes.disabled = false;
+          drawingStatusDisplay.textContent = '👀 Watching';
+          drawingStatusDisplay.style.color = '#95a5a6';
+          // Request existing strokes from server
+          if (socket && socket.connected && currentRoomId) {
+            socket.emit('request_sync_strokes', { roomId: currentRoomId });
+          }
+        }
+      });
+
+      socket.on('word_reveal', (data) => {
+        // Drawer receives the actual word
+        wordDisplay.textContent = data.word.toUpperCase();
+        addMessage('system', `✨ Your word is: ${data.word}`);
+      });
+
+      socket.on('word_hint', (data) => {
+        // Other players receive masked word
+        wordDisplay.textContent = data.hint;
+      });
+
+      socket.on('round_timer_update', (data) => {
+        timerDisplay.textContent = data.remainingTime;
+        
+        // Color coding for urgency
+        if (data.remainingTime <= 10) {
+          timerDisplay.style.color = '#e74c3c';
+        } else if (data.remainingTime <= 30) {
+          timerDisplay.style.color = '#f39c12';
+        } else {
+          timerDisplay.style.color = 'white';
+        }
+      });
+
+      // Phase 3: Updated correct_guess with points display
+      socket.on('correct_guess', (data) => {
+        if (data.userId === currentUserId) {
+          addMessage('system', `🎉 Correct! +${data.pointsEarned} points!`);
+          updateGameStatus('✅ You guessed correctly!');
+          inputGuess.disabled = true;
+          btnSubmitGuess.disabled = true;
+        } else {
+          addMessage('system', `✅ ${data.username} guessed correctly! (+${data.pointsEarned} pts)`);
+        }
+      });
+
+      // Phase 3: Close guess notification
+      socket.on('close_guess', (data) => {
+        addMessage('system', '🔥 ' + data.message);
+      });
+
+      socket.on('round_ended', (data) => {
+        currentRound = data.roundNumber;
+        totalRounds = data.totalRounds || totalRounds;
+        addMessage('system', `⏱️ Round ${data.roundNumber}/${data.totalRounds} ended! The word was: ${data.word}`);
+        gameState = 'round_end';
+        updateGameStatus('⏸️ Round ended');
+        wordDisplay.textContent = data.word.toUpperCase();
+        timerDisplay.textContent = '--';
+        inputGuess.disabled = true;
+        btnSubmitGuess.disabled = true;
+        // Phase 4: lock canvas between rounds
+        isDrawing = false;
+        setCanvasLocked(true, '⏸️ Round ended');
+        btnClearCanvas.disabled = true;
+        drawingStatusDisplay.textContent = '⏸️ Between rounds';
+        drawingStatusDisplay.style.color = '#e74c3c';
+        
+        // Show scores
+        let scoreMsg = 'Scores: ';
+        data.players.forEach(p => {
+          scoreMsg += `${p.username}: ${p.score} `;
+        });
+        addMessage('system', scoreMsg);
+      });
+
+      // Phase 3: Game ended with winner
+      socket.on('game_ended', (data) => {
+        addMessage('system', `🏆 GAME OVER!`);
+        addMessage('system', `👑 Winner: ${data.winner.username} with ${data.winner.score} points!`);
+        
+        gameState = 'finished';
+        updateGameStatus(`🏆 Winner: ${data.winner.username}!`);
+        wordDisplay.textContent = 'Game Complete';
+        timerDisplay.textContent = '🏁';
+        roundInfoDisplay.textContent = 'Game Finished';
+        
+        // Show leaderboard
+        addMessage('system', '📊 Final Leaderboard:');
+        data.leaderboard.forEach((player, index) => {
+          const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+          addMessage('system', `${medal} ${player.username}: ${player.score} points`);
+        });
+        
+        btnStartGame.disabled = false;
+        btnResetGame.disabled = false;
+        inputTotalRounds.disabled = false;
+        inputGuess.disabled = true;
+        btnSubmitGuess.disabled = true;
+        // Phase 4:
+        isDrawing = false;
+        setCanvasLocked(true, '🏆 Game over');
+        btnClearCanvas.disabled = true;
+        drawingStatusDisplay.textContent = '🏆 Game over';
+        drawingStatusDisplay.style.color = '#f39c12';
+      });
+
+      // Phase 3: Game reset
+      socket.on('game_reset', (data) => {
+        addMessage('system', '🔄 ' + data.message);
+        gameState = 'waiting';
+        currentRound = 0;
+        totalRounds = 0;
+        updateGameStatus('⏸️ Waiting to start');
+        wordDisplay.textContent = 'No word yet';
+        timerDisplay.textContent = '--';
+        roundInfoDisplay.textContent = 'Round: - / - | Drawer: -';
+        btnStartGame.disabled = false;
+        btnResetGame.disabled = false;
+        inputTotalRounds.disabled = false;
+        inputGuess.disabled = true;
+        btnSubmitGuess.disabled = true;
+        // Phase 4:
+        isDrawing = false;
+        clearCanvas();
+        setCanvasLocked(true, '⏸️ Waiting to start');
+        btnClearCanvas.disabled = true;
+        drawingStatusDisplay.textContent = 'Not drawing';
+        drawingStatusDisplay.style.color = '#888';
+      });
+
+      socket.on('game_stopped', (data) => {
+        addMessage('system', `🛑 Game stopped: ${data.reason}`);
+        gameState = 'waiting';
+        currentRound = 0;
+        totalRounds = 0;
+        updateGameStatus('⏸️ Waiting to start');
+        wordDisplay.textContent = 'No word yet';
+        timerDisplay.textContent = '--';
+        roundInfoDisplay.textContent = 'Round: - / - | Drawer: -';
+        btnStartGame.disabled = false;
+        btnResetGame.disabled = false;
+        inputTotalRounds.disabled = false;
+        inputGuess.disabled = true;
+        btnSubmitGuess.disabled = true;
+        // Phase 4:
+        isDrawing = false;
+        clearCanvas();
+        setCanvasLocked(true, '⏸️ Waiting to start');
+        btnClearCanvas.disabled = true;
+        drawingStatusDisplay.textContent = 'Not drawing';
+        drawingStatusDisplay.style.color = '#888';
+      });
+
+      socket.on('game_error', (data) => {
+        addMessage('error', `❌ Game Error: ${data.error}`);
+      });
+
+      // ============================================
+      // Phase 4: Drawing Events
+      // ============================================
+
+      // Phase 4: Incoming stroke batch from another player (server broadcast)
+      socket.on('draw_stroke_batch', (data) => {
+        data.strokes.forEach(s => {
+          drawLine(s.prevX, s.prevY, s.x, s.y, s.color, s.size);
+          localStrokeCount++;
+        });
+        strokeCountDisplay.textContent = localStrokeCount;
+      });
+
+      // Phase 4: Replay full stroke history (on join / reconnect)
+      socket.on('sync_strokes', (data) => {
+        clearCanvas();
+        data.strokes.forEach(s => {
+          drawLine(s.prevX, s.prevY, s.x, s.y, s.color, s.size);
+        });
+        localStrokeCount = data.strokes.length;
+        strokeCountDisplay.textContent = localStrokeCount;
+        addMessage('system', `🔄 Canvas synced: ${data.strokes.length} stroke(s) replayed`);
+      });
+
+      // Phase 4: Canvas cleared by server (round end)
+      socket.on('clear_canvas', () => {
+        clearCanvas();
+        addMessage('system', '🧹 Canvas cleared');
+      });
+    }
+
+    // Create room
+    btnCreateRoom.addEventListener('click', () => {
+      const roomId = inputRoomId.value.trim();
+      if (!roomId) {
+        alert('Please enter a room ID');
+        return;
+      }
+
+      socket.emit('create_room', { roomId }, (response) => {
+        if (!response.success) {
+          addMessage('error', `Failed to create room: ${response.error}`);
+        }
+      });
+    });
+
+    // Join room
+    btnJoinRoom.addEventListener('click', () => {
+      const roomId = inputRoomId.value.trim();
+      const username = inputUsername.value.trim();
+
+      if (!roomId || !username) {
+        alert('Please enter both room ID and username');
+        return;
+      }
+
+      socket.emit('join_room', { roomId, username }, (response) => {
+        if (!response.success) {
+          addMessage('error', `Failed to join room: ${response.error}`);
+        }
+      });
+    });
+
+    // Reconnect
+    btnReconnect.addEventListener('click', () => {
+      if (!currentRoomId || !currentUserId) {
+        alert('No previous session to reconnect to');
+        return;
+      }
+
+      if (!socket || !socket.connected) {
+        alert('Please connect to server first');
+        return;
+      }
+
+      socket.emit('reconnect_player', { 
+        roomId: currentRoomId, 
+        userId: currentUserId 
+      }, (response) => {
+        if (!response.success) {
+          addMessage('error', `Failed to reconnect: ${response.error}`);
+        }
+      });
+    });
+
+    // Send message
+    btnSendMessage.addEventListener('click', sendMessage);
+    inputMessage.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    function sendMessage() {
+      const message = inputMessage.value.trim();
+      if (!message) return;
+
+      socket.emit('send_message', { 
+        roomId: currentRoomId, 
+        message 
+      }, (response) => {
+        if (response && response.success) {
+          inputMessage.value = '';
+        }
+      });
+    }
+
+    // ============================================
+    // Phase 3: Game Controls (Updated)
+    // ============================================
+
+    // Start game with configurable rounds
+    btnStartGame.addEventListener('click', () => {
+      if (!currentRoomId) {
+        alert('Please join a room first');
+        return;
+      }
+
+      const rounds = parseInt(inputTotalRounds.value) || 3;
+      if (rounds < 1 || rounds > 10) {
+        alert('Please enter a number of rounds between 1 and 10');
+        return;
+      }
+
+      socket.emit('start_game', { 
+        roomId: currentRoomId,
+        totalRounds: rounds 
+      }, (response) => {
+        if (!response.success) {
+          addMessage('error', `Failed to start game: ${response.error}`);
+        }
+      });
+    });
+
+    // Reset game (Phase 3)
+    btnResetGame.addEventListener('click', () => {
+      if (!currentRoomId) {
+        alert('Please join a room first');
+        return;
+      }
+
+      socket.emit('reset_game', { roomId: currentRoomId }, (response) => {
+        if (!response.success) {
+          addMessage('error', `Failed to reset game: ${response.error}`);
+        }
+      });
+    });
+
+    // Phase 4: Clear canvas button (drawer only — server validates)
+    btnClearCanvas.addEventListener('click', () => {
+      if (!currentRoomId || !isDrawer) return;
+      // Local clear immediately for drawer
+      clearCanvas();
+      // Server will emit clear_canvas back to room (triggered via round end or future event)
+    });
+
+    // Phase 4: Manual sync button (all players)
+    btnSyncStrokes.addEventListener('click', () => {
+      if (!currentRoomId) {
+        alert('Please join a room first');
+        return;
+      }
+
+      socket.emit('request_sync_strokes', { 
+        roomId: currentRoomId 
+      }, (response) => {
+        if (response && response.success) {
+          console.log(`[Drawing] Synced ${response.strokeCount} strokes`);
+          addMessage('system', `Synced ${response.strokeCount} strokes`);
+        }
+      });
+    });
+
+    // Submit guess
+    btnSubmitGuess.addEventListener('click', submitGuess);
+    inputGuess.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') submitGuess();
+    });
+
+    function submitGuess() {
+      const guess = inputGuess.value.trim();
+      if (!guess) return;
+
+      socket.emit('submit_guess', { 
+        roomId: currentRoomId, 
+        guess 
+      }, (response) => {
+        if (response && response.success) {
+          inputGuess.value = '';
+        }
+      });
+    }
+
+    // Update game status display
+    function updateGameStatus(status) {
+      gameStatusDisplay.textContent = status;
+    }
+
+    // Add message to chat
+    function addMessage(type, text, timestamp = Date.now()) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${type}`;
+      
+      const time = new Date(timestamp).toLocaleTimeString();
+      messageDiv.innerHTML = `
+        ${text}
+        <span class="timestamp">${time}</span>
+      `;
+      
+      messagesDiv.appendChild(messageDiv);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // Update players list
+    function updatePlayersList(players) {
+      if (!players || players.length === 0) {
+        playersList.innerHTML = '<li style="color: #999; text-align: center; padding: 20px;">No players</li>';
+        return;
+      }
+
+      playersList.innerHTML = players.map(player => `
+        <li class="player-item">
+          <span>
+            <span class="status-dot ${player.isConnected ? 'online' : 'offline'}"></span>
+            ${player.username}
+          </span>
+          <span style="color: #999; font-size: 12px;">Score: ${player.score}</span>
+        </li>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
